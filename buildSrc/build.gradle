@@ -1,0 +1,24 @@
+plugins {
+    id "java-gradle-plugin"
+}
+
+repositories {
+    // Use the plugin portal to apply community plugins in convention plugins.
+    gradlePluginPortal()
+}
+
+sourceCompatibility = 17
+targetCompatibility = 17
+
+dependencies {
+    implementation("com.diffplug.gradle:goomph:3.35.0") // Only for Eclipse
+}
+
+gradlePlugin {
+    plugins {
+        conventionsPlugin {
+            id = "com.time.tdd.java-conventions"
+            implementationClass = "com.time.tdd.build.ConventionsPlugin"
+        }
+    }
+}

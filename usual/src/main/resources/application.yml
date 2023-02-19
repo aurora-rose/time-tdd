@@ -1,0 +1,58 @@
+spring:
+  application:
+    name: usual
+  datasource:
+    driver-class-name: org.h2.Driver
+    url: jdbc:h2:mem:time_usual
+    username: sa
+    password: sa
+
+server:
+  servlet:
+    context-path: /dev
+  port: 8080
+
+
+
+
+#spring.datasource:
+#  type: com.zaxxer.hikari.HikariDataSource
+#  url: jdbc:mysql://127.0.0.1:3306/tdd
+#  username: root
+#  password: 123456
+#  driver-class-name: com.mysql.cj.jdbc.Driver
+#  hikari:
+#    connection-timeout: 50000
+#    idle-timeout: 300000
+#    max-lifetime: 900000
+#    maximum-pool-size: 10
+#    minimum-idle: 10
+#    pool-name: MainPool
+#    connection-test-query: select 1 from dual
+#    data-source-properties:
+#      cachePrepStmts: true
+#      prepStmtCacheSize: 250
+#      prepStmtCacheSqlLimit: 2048
+#      useServerPrepStmts: true
+#      useLocalSessionState: true
+#      rewriteBatchedStatements: true
+#      cacheResultSetMetadata: true
+#      cacheServerConfiguration: true
+#      elideSetAutoCommits: true
+#      maintainTimeStats: false
+#
+#spring.jpa:
+#  show-sql: true
+#  hibernate:
+#    ddl-auto: none
+#    database-platform: org.hibernate.dialect.MySQL8Dialect
+#    naming:
+#      physical-strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
+#
+#
+#
+#logging.level.org.hibernate: INFO
+#logging.level.org.hibernate.SQL: DEBUG
+#logging.level.org.hibernate.cache: DEBUG
+#logging.level.org.hibernate.stat: DEBUG
+#logging.level.org.hibernate.type.descriptor.sql.BasicBinder: TRACE
