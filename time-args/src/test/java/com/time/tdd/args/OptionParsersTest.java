@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.InOrder;
 import static java.util.Arrays.asList;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -18,6 +19,10 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 /**
  * single
@@ -25,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * @author XuJian
  * @date 2023-02-18 22:00
  **/
-class CustomOptionParsersTest {
+class OptionParsersTest {
 
 
     static Option option(String value) {
@@ -88,6 +93,15 @@ class CustomOptionParsersTest {
 
         }
 
+        @Test
+            //Happy Path
+        void should_parse_value_if_flag_present_by_mock() {
+            Function parser = mock(Function.class);
+            OptionParsers.unary(any(), parser).parse(asList("-p", "8080"), option("p"));
+
+            verify(parser).apply("8080");
+        }
+
     }
 
     @Nested
@@ -129,6 +143,17 @@ class CustomOptionParsersTest {
         void should_parse_list_value() {
             String[] value = OptionParsers.list(String[]::new, String::valueOf).parse(asList("-g", "this", "is"), option("g"));
             Assertions.assertArrayEquals(new String[] {"this", "is"}, value);
+        }
+
+        @Test
+        void should_parse_list_value_by_mock() {
+
+            Function parser = mock(Function.class);
+            OptionParsers.list(Object[]::new, parser).parse(asList("-g", "this", "is"), option("g"));
+
+            InOrder order = inOrder(parser, parser);
+            order.verify(parser).apply("this");
+            order.verify(parser).apply("is");
         }
 
         @Test
