@@ -141,7 +141,7 @@ class OptionParsersTest {
 
         @Test
         void should_parse_list_value() {
-            String[] value = OptionParsers.list(String[]::new, String::valueOf).parse(asList("-g", "this", "is"), option("g"));
+            String[] value = OptionParsers.list(String::valueOf, String[]::new).parse(asList("-g", "this", "is"), option("g"));
             Assertions.assertArrayEquals(new String[] {"this", "is"}, value);
         }
 
@@ -149,7 +149,7 @@ class OptionParsersTest {
         void should_parse_list_value_by_mock() {
 
             Function parser = mock(Function.class);
-            OptionParsers.list(Object[]::new, parser).parse(asList("-g", "this", "is"), option("g"));
+            ((OptionParser<Object[]>) OptionParsers.list(parser, Object[]::new)).parse(asList("-g", "this", "is"), option("g"));
 
             InOrder order = inOrder(parser, parser);
             order.verify(parser).apply("this");
@@ -159,7 +159,7 @@ class OptionParsersTest {
         @Test
         void should_not_treat_negative_int_as_flag() {
             assertArrayEquals(new Integer[] {-1, -2},
-                OptionParsers.list(Integer[]::new, Integer::parseInt).parse(asList("-g", "-1", "-2"), option("g"))
+                OptionParsers.list(Integer::parseInt, Integer[]::new).parse(asList("-g", "-1", "-2"), option("g"))
             );
         }
 
@@ -167,7 +167,7 @@ class OptionParsersTest {
 
         @Test
         void should_use_empty_array_as_default_value() {
-            String[] value = OptionParsers.list(String[]::new, String::valueOf).parse(asList(), option("g"));
+            String[] value = OptionParsers.list(String::valueOf, String[]::new).parse(asList(), option("g"));
             assertEquals(0, value.length);
         }
         // TODO: -d a throw exception
@@ -179,7 +179,7 @@ class OptionParsersTest {
             };
 
             IllegalValueException e = assertThrows(IllegalValueException.class, () ->
-                OptionParsers.list(String[]::new, parser).parse(asList("-g", "this", "is"), option("g")));
+                OptionParsers.list(parser, String[]::new).parse(asList("-g", "this", "is"), option("g")));
 
             assertEquals("g", e.getOption());
             assertEquals("this", e.getValue());

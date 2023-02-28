@@ -1,11 +1,15 @@
 package com.time.tdd.args;
 
 import com.time.tdd.args.exceptions.IllegalOptionException;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * @author XuJian
@@ -82,16 +86,33 @@ class ArgsTest {
         assertEquals("port", e.getParameter());
     }
 
-    record OptionWithoutAnnotation(@Option("l") boolean logging, int port, @Option("d") String directory) {
+    @Test
+    void should_parse_options_if_option_parser_provided() {
+        OptionParser boolParser = mock(OptionParser.class);
+        OptionParser intParser = mock(OptionParser.class);
+        OptionParser stringParser = mock(OptionParser.class);
+
+        when(boolParser.parse(any(), any())).thenReturn(true);
+        when(intParser.parse(any(), any())).thenReturn(1000);
+        when(stringParser.parse(any(), any())).thenReturn("parsed");
+
+        Args<MultiOptions> args = new Args<>(MultiOptions.class, Map.of(
+            boolean.class, boolParser, int.class, intParser, String.class, stringParser));
+
+        MultiOptions options = args.parse("-l", "-p", "8080", "-d", "/usr/logs");
+        assertTrue(options.logging());
+        assertEquals(1000, options.port());
+        assertEquals("parsed", options.directory());
     }
 
+    record OptionWithoutAnnotation(@Option("l") boolean logging, int port, @Option("d") String directory) {
+    }
 
     record MultiOptions(@Option("l") boolean logging, @Option("p") int port, @Option("d") String directory) {
     }
 
     record Options(@Option("l") boolean logging, @Option("p") int port, @Option("d") String directory) {
     }
-
 
     record ListOptions(@Option("g") String[] group, @Option("d") Integer[] decimals) {
     }

@@ -1,6 +1,7 @@
 package com.time.tdd.args.custom;
 
 import com.time.tdd.args.exceptions.IllegalOptionException;
+import com.time.tdd.args.exceptions.UnsupportedOptionTypeException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Parameter;
 import java.util.Arrays;
@@ -14,17 +15,32 @@ import static com.time.tdd.args.custom.OptionParsers.unary;
  * @date 2023-02-19 20:44
  **/
 public class CustomArgs {
-    private static final Map<Class<?>, OptionParser> PASSER = Map.of(
+    private static final Map<Class<?>, OptionParser> PARSERS = Map.of(
         boolean.class, bool(),
         int.class, unary(0, Integer::parseInt),
         String.class, unary("", String::valueOf)
     );
 
     public static <T> T parse(Class<T> optionClass, String... args) {
-        List<String> arguments = List.of(args);
-        Constructor<?> constructor = optionClass.getDeclaredConstructors()[0];
-        Object[] values = Arrays.stream(constructor.getParameters()).map(it -> getOptionParser(arguments, it)).toArray();
+        return getT(PARSERS, optionClass, args);
+    }
 
+
+    private static Object parseOption(List<String> arguments, Parameter parameter, Map<Class<?>, OptionParser> parser) {
+        if (!parameter.isAnnotationPresent(CustomOption.class)) {
+            throw new IllegalOptionException(parameter.getName());
+        }
+        CustomOption option = parameter.getAnnotation(CustomOption.class);
+        if (!parser.containsKey(parameter.getType())) {
+            throw new UnsupportedOptionTypeException(option.value(), parameter.getType());
+        }
+        return parser.get(parameter.getType()).parse(arguments, option);
+    }
+
+    public static <T> T getT(Map<Class<?>, OptionParser> parser, Class<T> optionsClass, String[] args) {
+        List<String> arguments = List.of(args);
+        Constructor<?> constructor = optionsClass.getDeclaredConstructors()[0];
+        Object[] values = Arrays.stream(constructor.getParameters()).map(it -> parseOption(arguments, it, parser)).toArray();
 
         try {
             return (T) constructor.newInstance(values);
@@ -35,13 +51,5 @@ public class CustomArgs {
             throw new RuntimeException(e);
         }
     }
-
-    private static Object getOptionParser(List<String> arguments, Parameter parameter) {
-        if (!parameter.isAnnotationPresent(CustomOption.class)) {
-            throw new IllegalOptionException(parameter.getName());
-        }
-        return PASSER.get(parameter.getType()).parse(arguments, parameter.getAnnotation(CustomOption.class));
-    }
-
 }
 

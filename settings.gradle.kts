@@ -138,12 +138,12 @@ dependencyResolutionManagement {
 
 
 includeProject("usual", "usual")
-includeProject("args","time-args")
+includeProject("args", "time-args")
+includeProject("args-other", "args-other")
+includeProject("container", "di-container")
 
 
-
-
-fun includeProject(name: String, path: String,changeBuildFileName: Boolean = true) {
+fun includeProject(name: String, path: String, changeBuildFileName: Boolean = true) {
     include(":$name")
     project(":$name").projectDir = File(settingsDir, path)
     if (changeBuildFileName) {

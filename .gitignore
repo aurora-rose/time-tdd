@@ -1,6 +1,7 @@
 usual/HELP.md
 .gradle
 build/
+.build-cache
 !../gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
 !**/src/test/**/build/
