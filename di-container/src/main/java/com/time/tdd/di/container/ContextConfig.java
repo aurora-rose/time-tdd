@@ -2,11 +2,13 @@ package com.time.tdd.di.container;
 
 import com.time.tdd.di.container.exceptions.CyclicDependenciesFoundException;
 import com.time.tdd.di.container.exceptions.DependencyNotFoundException;
+import java.lang.reflect.ParameterizedType;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Stack;
+import jakarta.inject.Provider;
 import static java.util.List.of;
 
 /**
@@ -18,21 +20,11 @@ public class ContextConfig {
     private final Map<Class<?>, ComponentProvider<?>> providers = new HashMap<>();
 
     public <Type> void bind(Class<Type> type, Type instance) {
-        providers.put(type, new ComponentProvider<Type>() {
-            @Override
-            public Type get(Context context) {
-                return instance;
-            }
-
-            @Override
-            public List<Class<?>> getDependencies() {
-                return of();
-            }
-        });
+        providers.put(type, (ComponentProvider<Type>) context -> instance);
     }
 
     public <Type, Implementation extends Type> void bind(Class<Type> type, Class<Implementation> implementation) {
-        providers.put(type, new ConstructorInjectionProvider<>(implementation));
+        providers.put(type, new InjectionProvider<>(implementation));
     }
 
     public Context getContext() {
@@ -43,6 +35,15 @@ public class ContextConfig {
             @Override
             public <Type> Optional<Type> get(Class<Type> type) {
                 return Optional.ofNullable(providers.get(type)).map(provider -> (Type) provider.get(this));
+            }
+
+            @Override
+            public Optional get(ParameterizedType type) {
+                if (type.getRawType() != Provider.class) {
+                    return Optional.empty();
+                }
+                Class<?> component = (Class<?>) type.getActualTypeArguments()[0];
+                return Optional.ofNullable(providers.get(component)).map(provider -> (Provider<Object>) () -> provider.get(this));
             }
         };
     }
@@ -65,7 +66,9 @@ public class ContextConfig {
     interface ComponentProvider<T> {
         T get(Context context);
 
-        List<Class<?>> getDependencies();
+        default List<Class<?>> getDependencies() {
+            return of();
+        }
     }
 
 }
