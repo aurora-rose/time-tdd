@@ -8,7 +8,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Parameter;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -18,6 +18,7 @@ import java.util.function.BiFunction;
 import java.util.stream.Stream;
 import jakarta.inject.Inject;
 import static java.util.Arrays.stream;
+import static java.util.stream.Stream.concat;
 
 /**
  * @author XuJian
@@ -104,21 +105,15 @@ class InjectionProvider<T> implements ContextConfig.ComponentProvider<T> {
     }
 
     private static Object[] toDependencies(Context context, Executable executable) {
-        return stream(executable.getParameters()).map(p -> {
-            Type type = p.getParameterizedType();
-            if (type instanceof ParameterizedType) {
-                return context.get((ParameterizedType) type).get();
-            }
-            return context.get((Class<?>) type).get();
-        }).toArray(Object[]::new);
+        return stream(executable.getParameters()).map(p -> toDependency(context, p.getParameterizedType())).toArray(Object[]::new);
+    }
+
+    private static Object toDependency(Context context, Type type) {
+        return context.get(Context.Ref.of(type)).get();
     }
 
     private static Object toDependency(Context context, Field field) {
-        Type type = field.getGenericType();
-        if (type instanceof ParameterizedType) {
-            return context.get((ParameterizedType) type).get();
-        }
-        return context.get((Class<?>) type).get();
+        return toDependency(context, field.getGenericType());
     }
 
     @Override
@@ -137,11 +132,13 @@ class InjectionProvider<T> implements ContextConfig.ComponentProvider<T> {
         }
     }
 
+
     @Override
-    public List<Class<?>> getDependencies() {
-        return Stream.concat(Stream.concat(stream(injectConstructor.getParameterTypes()), injectFields.stream().map(Field::getType)),
-            injectMethods.stream().flatMap(m -> stream(m.getParameterTypes()))
-        ).toList();
+    public List<Context.Ref> getDependencies() {
+        return concat(concat(stream(injectConstructor.getParameters()).map(Parameter::getParameterizedType),
+                injectFields.stream().map(Field::getGenericType)),
+            injectMethods.stream().flatMap(m -> stream(m.getParameters()).map(Parameter::getParameterizedType)))
+            .map(Context.Ref::of).toList();
     }
 }
 

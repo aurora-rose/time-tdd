@@ -27,12 +27,13 @@ public class InjectionTest {
     private Dependency dependency = mock(Dependency.class);
     private Provider<Dependency> dependencyProvider = mock(Provider.class);
     private Context context = mock(Context.class);
+    private ParameterizedType dependencyProviderType;
 
     @BeforeEach
     public void setup() throws NoSuchFieldException {
-        ParameterizedType providerType = (ParameterizedType) InjectionTest.class.getDeclaredField("dependencyProvider").getGenericType();
-        when(context.get(eq(Dependency.class))).thenReturn(Optional.of(dependency));
-        when(context.get(eq(providerType))).thenReturn(Optional.of(dependencyProvider));
+        dependencyProviderType = (ParameterizedType) InjectionTest.class.getDeclaredField("dependencyProvider").getGenericType();
+        when(context.get(eq(Context.Ref.of(Dependency.class)))).thenReturn(Optional.of(dependency));
+        when(context.get(eq(Context.Ref.of(dependencyProviderType)))).thenReturn(Optional.of(dependencyProvider));
 
     }
 
@@ -115,7 +116,8 @@ public class InjectionTest {
                 InjectionProvider<InjectConstructor> provider =
                     new InjectionProvider<>(InjectConstructor.class);
 
-                assertArrayEquals(new Class<?>[] {Dependency.class}, provider.getDependencies().toArray(Class<?>[]::new));
+                assertArrayEquals(new Context.Ref[] {Context.Ref.of(Dependency.class)},
+                    provider.getDependencies().toArray(Context.Ref[]::new));
             }
 
             @Test
@@ -123,6 +125,13 @@ public class InjectionTest {
                 ProviderInjectConstructor instance = new InjectionProvider<>(ProviderInjectConstructor.class).get(context);
 
                 assertSame(dependencyProvider, instance.dependency);
+            }
+
+            @Test
+            void should_include_provider_type_from_inject_constructor() {
+                InjectionProvider<ProviderInjectConstructor> provider = new InjectionProvider<>(ProviderInjectConstructor.class);
+                assertArrayEquals(new Context.Ref[] {Context.Ref.of(dependencyProviderType)},
+                    provider.getDependencies().toArray(Context.Ref[]::new));
             }
 
             static class InjectConstructor {
@@ -193,7 +202,8 @@ public class InjectionTest {
             void should_include_dependency_from_field_dependency() {
                 InjectionProvider<ComponentWithFieldInjection> provider =
                     new InjectionProvider<>(ComponentWithFieldInjection.class);
-                assertArrayEquals(new Class<?>[] {Dependency.class}, provider.getDependencies().toArray(Class<?>[]::new));
+                assertArrayEquals(new Context.Ref[] {Context.Ref.of(Dependency.class)},
+                    provider.getDependencies().toArray(Context.Ref[]::new));
             }
 
             @Test
@@ -201,6 +211,13 @@ public class InjectionTest {
                 ProviderInjectField instance = new InjectionProvider<>(ProviderInjectField.class).get(context);
 
                 assertSame(dependencyProvider, instance.dependency);
+            }
+
+            @Test
+            void should_include_provider_type_from_inject_field() {
+                InjectionProvider<ProviderInjectField> provider = new InjectionProvider<>(ProviderInjectField.class);
+                assertArrayEquals(new Context.Ref[] {Context.Ref.of(dependencyProviderType)},
+                    provider.getDependencies().toArray(Context.Ref[]::new));
             }
 
 
@@ -264,7 +281,8 @@ public class InjectionTest {
                 InjectionProvider<InjectMethodWithDependency> provider =
                     new InjectionProvider<>(InjectMethodWithDependency.class);
 
-                assertArrayEquals(new Class<?>[] {Dependency.class}, provider.getDependencies().toArray(Class<?>[]::new));
+                assertArrayEquals(new Context.Ref[] {Context.Ref.of(Dependency.class)},
+                    provider.getDependencies().toArray(Context.Ref[]::new));
             }
 
             @Test
@@ -297,6 +315,13 @@ public class InjectionTest {
                 ProviderInjectMethod instance = new InjectionProvider<>(ProviderInjectMethod.class).get(context);
 
                 assertSame(dependencyProvider, instance.dependency);
+            }
+
+            @Test
+            void should_include_provider_type_from_inject_method() {
+                InjectionProvider<ProviderInjectMethod> provider = new InjectionProvider<>(ProviderInjectMethod.class);
+                assertArrayEquals(new Context.Ref[] {Context.Ref.of(dependencyProviderType)},
+                    provider.getDependencies().toArray(Context.Ref[]::new));
             }
 
             static class SubClassOverrideSuperClassWithNoInject extends SuperClassInjectMethod {

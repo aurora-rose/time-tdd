@@ -2,14 +2,12 @@ package com.time.tdd.di.container;
 
 import com.time.tdd.di.container.exceptions.CyclicDependenciesFoundException;
 import com.time.tdd.di.container.exceptions.DependencyNotFoundException;
-import java.lang.reflect.ParameterizedType;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Stack;
 import jakarta.inject.Provider;
-import static java.util.List.of;
 
 /**
  * @author XuJian
@@ -32,42 +30,44 @@ public class ContextConfig {
         providers.keySet().forEach(component -> checkDependencies(component, new Stack<>()));
 
         return new Context() {
-            @Override
-            public <Type> Optional<Type> get(Class<Type> type) {
-                return Optional.ofNullable(providers.get(type)).map(provider -> (Type) provider.get(this));
-            }
+            // Type -> Reference
 
             @Override
-            public Optional get(ParameterizedType type) {
-                if (type.getRawType() != Provider.class) {
-                    return Optional.empty();
+            public Optional<?> get(Ref ref) {
+                if (ref.isContainer()) {
+                    if (ref.getContainer() != Provider.class) {
+                        return Optional.empty();
+                    }
+                    return Optional.ofNullable(providers.get(ref.getComponent()))
+                        .map(provider -> (Provider<Object>) () -> provider.get(this));
                 }
-                Class<?> component = (Class<?>) type.getActualTypeArguments()[0];
-                return Optional.ofNullable(providers.get(component)).map(provider -> (Provider<Object>) () -> provider.get(this));
+                return Optional.ofNullable(providers.get(ref.getComponent())).map(provider -> provider.get(this));
             }
         };
     }
 
     private void checkDependencies(Class<?> component, Stack<Class<?>> visiting) {
-        for (Class<?> dependency : providers.get(component).getDependencies()) {
-            if (!providers.containsKey(dependency)) {
-                throw new DependencyNotFoundException(component, dependency);
+        for (Context.Ref dependency : providers.get(component).getDependencies()) {
+            if (!providers.containsKey(dependency.getComponent())) {
+                throw new DependencyNotFoundException(component, dependency.getComponent());
             }
-            if (visiting.contains(dependency)) {
-                throw new CyclicDependenciesFoundException(visiting);
+            if (!dependency.isContainer()) {
+                if (visiting.contains(dependency.getComponent())) {
+                    throw new CyclicDependenciesFoundException(visiting);
+                }
+                visiting.push(dependency.getComponent());
+                checkDependencies(dependency.getComponent(), visiting);
+                visiting.pop();
             }
-            visiting.push(dependency);
-            checkDependencies(dependency, visiting);
-            visiting.pop();
         }
     }
-
 
     interface ComponentProvider<T> {
         T get(Context context);
 
-        default List<Class<?>> getDependencies() {
-            return of();
+
+        default List<Context.Ref> getDependencies() {
+            return List.of();
         }
     }
 
