@@ -1,5 +1,6 @@
 package com.time.tdd.di.container.exceptions;
 
+import com.time.tdd.di.container.Component;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -10,15 +11,15 @@ import java.util.Set;
  **/
 public class CyclicDependenciesFoundException extends RuntimeException {
 
-    private Set<Class<?>> components = new HashSet<>();
+    private Set<Component> components = new HashSet<>();
 
 
-    public CyclicDependenciesFoundException(List<Class<?>> visiting) {
+    public CyclicDependenciesFoundException(List<Component> visiting) {
         components.addAll(visiting);
     }
 
     public Class<?>[] getComponents() {
-        return components.toArray(Class<?>[]::new);
+        return components.stream().map(Component::type).toArray(Class<?>[]::new);
     }
 }
 

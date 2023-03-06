@@ -1,23 +1,26 @@
 package com.time.tdd.di.container.exceptions;
 
+import com.time.tdd.di.container.Component;
+
 /**
  * @author XuJian
  * @date 2023-02-25 18:54
  **/
 public class DependencyNotFoundException extends RuntimeException {
-    private Class<?> component;
-    private Class<?> dependency;
+    private Component component;
+    private Component dependency;
 
-    public DependencyNotFoundException(Class<?> component, Class<?> dependency) {
+    public DependencyNotFoundException(Component component, Component dependency) {
         this.component = component;
         this.dependency = dependency;
     }
 
-    public Class<?> getDependency() {
+
+    public Component getDependency() {
         return dependency;
     }
 
-    public Class<?> getComponent() {
+    public Component getComponent() {
         return component;
     }
 }
