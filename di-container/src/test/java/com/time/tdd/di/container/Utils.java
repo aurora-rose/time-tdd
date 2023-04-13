@@ -3,6 +3,8 @@ package com.time.tdd.di.container;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import jakarta.inject.Qualifier;
 import jakarta.inject.Scope;
@@ -10,21 +12,23 @@ import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
+interface AnotherDependency {
+
+}
+
+interface Dependency {
+
+}
+
 interface TestComponent {
     default Dependency dependency() {
         return null;
     }
+
 }
 
-interface Dependency {
-}
-
-interface AnotherDependency {
-}
-
-
-@Retention(RUNTIME)
 @Documented
+@Retention(RUNTIME)
 @Qualifier
 @interface Skywalker {
 }
@@ -35,6 +39,14 @@ interface AnotherDependency {
 @interface Pooled {
 }
 
+record TestLiteral() implements Test {
+
+    @Override
+    public Class<? extends Annotation> annotationType() {
+        return Test.class;
+    }
+}
+
 record NamedLiteral(String value) implements jakarta.inject.Named {
 
     @Override
@@ -42,9 +54,8 @@ record NamedLiteral(String value) implements jakarta.inject.Named {
         return jakarta.inject.Named.class;
     }
 
-
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(final Object o) {
         if (o instanceof jakarta.inject.Named named) {
             return Objects.equals(value, named.value());
         }
@@ -58,44 +69,51 @@ record NamedLiteral(String value) implements jakarta.inject.Named {
 }
 
 record SkywalkerLiteral() implements Skywalker {
-
     @Override
     public Class<? extends Annotation> annotationType() {
         return Skywalker.class;
     }
 
     @Override
-    public boolean equals(Object o) {
-        return o instanceof Skywalker;
-    }
-}
-
-record TestLiteral() implements Test {
-
-    @Override
-    public Class<? extends Annotation> annotationType() {
-        return Test.class;
+    public boolean equals(final Object obj) {
+        return obj instanceof Skywalker;
     }
 }
 
 record SingletonLiteral() implements Singleton {
-
     @Override
     public Class<? extends Annotation> annotationType() {
         return Singleton.class;
     }
-
-    @Override
-    public boolean equals(Object obj) {
-        return obj instanceof Singleton;
-    }
 }
 
 record PooledLiteral() implements Pooled {
-
     @Override
     public Class<? extends Annotation> annotationType() {
         return Pooled.class;
     }
 }
 
+class PooledProvider<T> implements ComponentProvider<T> {
+    public static final int MAX = 2;
+    private List<T> pool = new ArrayList<>();
+    private int current;
+    private ComponentProvider<T> provider;
+
+    public PooledProvider(final ComponentProvider<T> provider) {
+        this.provider = provider;
+    }
+
+    @Override
+    public T get(final Context context) {
+        if (pool.size() < MAX) {
+            pool.add(provider.get(context));
+        }
+        return pool.get(current++ % MAX);
+    }
+
+    @Override
+    public List<ComponentRef<?>> getDependencies() {
+        return provider.getDependencies();
+    }
+}

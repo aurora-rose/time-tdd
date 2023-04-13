@@ -141,6 +141,7 @@ includeProject("usual", "usual")
 includeProject("args", "time-args")
 includeProject("args-other", "args-other")
 includeProject("container", "di-container")
+includeProject("restful", "restful", false)
 
 
 fun includeProject(name: String, path: String, changeBuildFileName: Boolean = true) {

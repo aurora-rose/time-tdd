@@ -10,61 +10,57 @@ import java.util.Objects;
  * @date 2023-03-03 00:16
  **/
 public class ComponentRef<ComponentType> {
-    private Type container;
     private Component component;
-
+    private Type container;
 
     ComponentRef(Type type, Annotation qualifier) {
         init(type, qualifier);
     }
 
-
-    ComponentRef(Class<ComponentType> componentType) {
-        init(componentType, null);
+    protected ComponentRef() {
+        this(null);
     }
 
-    protected ComponentRef() {
+    protected ComponentRef(Annotation qualifier) {
         Type type = ((ParameterizedType) getClass().getGenericSuperclass()).getActualTypeArguments()[0];
-        init(type, null);
+        init(type, qualifier);
     }
 
     public static <ComponentType> ComponentRef<ComponentType> of(Class<ComponentType> component) {
-        return new ComponentRef<>(component);
+        return of(component, null);
     }
 
     public static <ComponentType> ComponentRef<ComponentType> of(Class<ComponentType> component, Annotation qualifier) {
         return new ComponentRef<>(component, qualifier);
     }
 
-    static ComponentRef of(Type type) {
-        return new ComponentRef(type, null);
+    public static ComponentRef of(Type type) {
+        return of(type, null);
     }
 
-    static ComponentRef of(Type type, Annotation qualifier) {
+    public static ComponentRef of(Type type, Annotation qualifier) {
         return new ComponentRef(type, qualifier);
     }
 
     private void init(Type type, Annotation qualifier) {
         if (type instanceof ParameterizedType container) {
+            component = new Component((Class<ComponentType>) container.getActualTypeArguments()[0], qualifier);
             this.container = container.getRawType();
-            Class<ComponentType> componentType = (Class<ComponentType>) container.getActualTypeArguments()[0];
-            this.component = new Component(componentType, qualifier);
         } else {
-            Class<ComponentType> componentType = (Class<ComponentType>) type;
-            this.component = new Component(componentType, qualifier);
+            component = new Component((Class<ComponentType>) type, qualifier);
         }
     }
 
-    public Component component() {
-        return component;
+    public boolean isContainer() {
+        return container != null;
     }
 
     public Type getContainer() {
         return container;
     }
 
-    public boolean isContainer() {
-        return container != null;
+    public Component component() {
+        return component;
     }
 
     @Override
@@ -75,13 +71,13 @@ public class ComponentRef<ComponentType> {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        ComponentRef<?> that = (ComponentRef<?>) o;
-        return Objects.equals(container, that.container) && component.equals(that.component);
+        ComponentRef<?> componentRef = (ComponentRef<?>) o;
+        return component.equals(componentRef.component) && Objects.equals(container, componentRef.container);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(container, component);
+        return Objects.hash(component, container);
     }
 }
 
