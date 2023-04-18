@@ -27,6 +27,14 @@ public class ResourceServlet extends HttpServlet {
 
     }
 
+    private static void headers(HttpServletResponse resp, MultivaluedMap<String, Object> headers) {
+        for (String name : headers.keySet()) {
+            for (Object value : headers.get(name)) {
+                RuntimeDelegate.HeaderDelegate headerDelegate = RuntimeDelegate.getInstance().createHeaderDelegate(value.getClass());
+                resp.addHeader(name, headerDelegate.toString(value));
+            }
+        }
+    }
 
     @Override
     protected void service(HttpServletRequest req, HttpServletResponse resp) {
@@ -50,18 +58,13 @@ public class ResourceServlet extends HttpServlet {
         return (OutboundResponse) mapper.toResponse(throwable);
     }
 
-
     private void respond(HttpServletResponse resp, OutboundResponse response) throws IOException {
         resp.setStatus(response.getStatus());
-        MultivaluedMap<String, Object> headers = response.getHeaders();
-        for (String name : headers.keySet()) {
-            for (Object value : headers.get(name)) {
-                RuntimeDelegate.HeaderDelegate headerDelegate = RuntimeDelegate.getInstance().createHeaderDelegate(value.getClass());
-                resp.addHeader(name, headerDelegate.toString(value));
-            }
-        }
+        headers(resp, response.getHeaders());
+        body(resp, response, response.getGenericEntity());
+    }
 
-        GenericEntity entity = response.getGenericEntity();
+    private void body(HttpServletResponse resp, OutboundResponse response, GenericEntity entity) throws IOException {
         if (entity != null) {
 
             MessageBodyWriter writer =

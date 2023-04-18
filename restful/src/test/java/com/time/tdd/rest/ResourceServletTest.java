@@ -31,6 +31,7 @@ import jakarta.ws.rs.ext.RuntimeDelegate;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DynamicTest;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestFactory;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -90,154 +91,30 @@ public class ResourceServletTest extends ServletTest {
     }
 
 
-    // TODO: 2023/4/14 use status code as http status
-
-    @Test
-    public void should_use_status_from_response() {
-        response.status(Response.Status.NOT_MODIFIED).returnFrom(router);
-
-        HttpResponse<String> httpResponse = get("/test");
-        assertEquals(Response.Status.NOT_MODIFIED.getStatusCode(), httpResponse.statusCode());
-    }
-
-    // TODO: 2023/4/14 use headers as http headers
-    @Test
-    void should_use_http_headers_from_response() {
-        response
-            .headers("Set-Cookie", new NewCookie.Builder("SESSION_ID").value("session").build(),
-                new NewCookie.Builder("USER_ID").value("user").build())
-            .returnFrom(router);
-
-        HttpResponse<String> httpResponse = get("/test");
-
-        assertArrayEquals(new String[] {"SESSION_ID=session", "USER_ID=user"},
-            httpResponse.headers().allValues("Set-Cookie").toArray());
-    }
-
-
-    // TODO: 2023/4/14 writer body using MessageBodyWriter
-    @Test
-    void should_writer_entity_to_http_response_using_message_body_writer() {
-        response
-            .entity(new GenericEntity<>("entity", String.class), new Annotation[0])
-            .returnFrom(router);
-
-        HttpResponse<String> httpResponse = get("/test");
-
-        Assertions.assertEquals("entity", httpResponse.body());
-    }
-
-
-    // TODO: 2023/4/14 throw WebApplicationException with response, use response
-    @Test
-    void should_use_response_from_web_application_exception() {
-        response.status(Response.Status.FORBIDDEN)
-            .headers(HttpHeaders.SET_COOKIE, new NewCookie.Builder("SESSION_ID").value("session").build())
-            .entity(new GenericEntity<>("error", String.class), new Annotation[0])
-            .throwFrom(router);
-
-        HttpResponse<String> httpResponse = get("/test");
-
-        assertEquals(Response.Status.FORBIDDEN.getStatusCode(), httpResponse.statusCode());
-        assertArrayEquals(new String[] {"SESSION_ID=session"},
-            httpResponse.headers().allValues(HttpHeaders.SET_COOKIE).toArray(String[]::new));
-        assertEquals("error", httpResponse.body());
-
-    }
-
-
-    // TODO: 2023/4/14 throw other exception, use ExceptionMapper build response
-    @Test
-    void should_build_response_by_exception_mapper_if_null_response_from_web_application_exception() {
-        when(router.dispatch(any(), eq(resourceContext))).thenThrow(RuntimeException.class);
-
-        when(providers.getExceptionMapper(eq(RuntimeException.class))).thenReturn(
-            exception1 -> response.status(Response.Status.FORBIDDEN).build());
-
-        HttpResponse<String> httpResponse = get("/test");
-        assertEquals(Response.Status.FORBIDDEN.getStatusCode(), httpResponse.statusCode());
-
-    }
-
-
-    // TODO: 2023/4/15 entity is null , ignored WriterBodMessage
-    @Test
-    void should_not_call_message_body_writer_if_entity_is_null() {
-        response.entity(null, new Annotation[0]).returnFrom(router);
-
-        HttpResponse<String> httpResponse = get("/test");
-
-        assertEquals(Response.Status.OK.getStatusCode(), httpResponse.statusCode());
-        assertEquals("", httpResponse.body());
-    }
-
-
-    // TODO: 2023/4/15 exception mapper
-    @Test
-    void should_use_response_from_web_application_exception_throw_by_exception_mapper() {
-        when(router.dispatch(any(), eq(resourceContext))).thenThrow(RuntimeException.class);
-
-        when(providers.getExceptionMapper(eq(RuntimeException.class))).thenReturn(
-            exception -> {
-                throw new WebApplicationException(response.status(Response.Status.FORBIDDEN).build());
-            });
-
-        HttpResponse<String> httpResponse = get("/test");
-        assertEquals(Response.Status.FORBIDDEN.getStatusCode(), httpResponse.statusCode());
-    }
-
-    @Test
-    void should_map_exception_throw_by_exception_mapper() {
-        when(router.dispatch(any(), eq(resourceContext))).thenThrow(RuntimeException.class);
-
-        when(providers.getExceptionMapper(eq(RuntimeException.class))).thenReturn(
-            exception -> {
-                throw new IllegalArgumentException();
-            });
-
-        when(providers.getExceptionMapper(eq(IllegalArgumentException.class))).thenReturn(
-            exception -> response.status(Response.Status.FORBIDDEN).build());
-
-        HttpResponse<String> httpResponse = get("/test");
-        assertEquals(Response.Status.FORBIDDEN.getStatusCode(), httpResponse.statusCode());
-    }
-
-
     // TODO: 2023/4/14 500 if MessageBodyWriter not found
-    @Test
-    void should_respond_with_internal_server_error_if_no_message_body_writer_found() {
-        response().entity(new GenericEntity<>(1, Integer.class), new Annotation[0]).returnFrom(router);
-
-        when(providers.getExceptionMapper(eq(NullPointerException.class))).thenReturn(
-            e -> response().status(Response.Status.INTERNAL_SERVER_ERROR).build());
-        HttpResponse<String> httpResponse = get("/test");
-        assertEquals(Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), httpResponse.statusCode());
-    }
-
-
     // TODO: 2023/4/15 500 if header delegate
-    @Test
-    void should_respond_with_internal_server_error_if_no_header_delegate_found() {
-        response().headers(HttpHeaders.DATE, new Date()).returnFrom(router);
-
-        when(providers.getExceptionMapper(eq(NullPointerException.class))).thenReturn(
-            e -> response().status(Response.Status.INTERNAL_SERVER_ERROR).build());
-        HttpResponse<String> httpResponse = get("/test");
-        assertEquals(Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), httpResponse.statusCode());
-    }
-
     // TODO: 2023/4/15 500 if exception mapper
-    @Test
-    void should_respond_with_internal_server_error_if_no_exception_mapper_found() {
-        when(router.dispatch(any(), eq(resourceContext))).thenThrow(IllegalArgumentException.class);
+    @TestFactory
+    public List<DynamicTest> RespondWhenExtensionMissing() {
+        List<DynamicTest> tests = new ArrayList<>();
+        Map<String, org.junit.jupiter.api.function.Executable> extensions = Map.of(
+            "MessageBodyWriter", () -> response().entity(new GenericEntity<>(1, Integer.class), new Annotation[0]).returnFrom(router),
+            "HeaderDelegate", () -> response().headers(HttpHeaders.DATE, new Date()).returnFrom(router),
+            "ExceptionMapper", () -> when(router.dispatch(any(), eq(resourceContext))).thenThrow(IllegalArgumentException.class)
+        );
 
-        when(providers.getExceptionMapper(eq(NullPointerException.class))).thenReturn(
-            e -> response().status(Response.Status.INTERNAL_SERVER_ERROR).build());
-        HttpResponse<String> httpResponse = get("/test");
+        for (String name : extensions.keySet()) {
+            tests.add(DynamicTest.dynamicTest(name + " not found ", () -> {
+                extensions.get(name).execute();
+                when(providers.getExceptionMapper(eq(NullPointerException.class))).thenReturn(
+                    e -> response().status(Response.Status.INTERNAL_SERVER_ERROR).build());
+                HttpResponse<String> httpResponse = get("/test");
+                assertEquals(Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), httpResponse.statusCode());
+            }));
+        }
 
-        assertEquals(Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), httpResponse.statusCode());
+        return tests;
     }
-
 
     // TODO: 2023/4/15 providers gets exception mapper
     @ExceptionThrownFrom
@@ -246,7 +123,6 @@ public class ResourceServletTest extends ServletTest {
         when(providers.getExceptionMapper(eq(RuntimeException.class))).thenThrow(exception);
     }
 
-
     // TODO: 2023/4/15 runtime delegate
     @ExceptionThrownFrom
     private void runtimeDelegate_createHeaderDelegate(RuntimeException exception) {
@@ -254,7 +130,6 @@ public class ResourceServletTest extends ServletTest {
 
         when(delegate.createHeaderDelegate(eq(MediaType.class))).thenThrow(exception);
     }
-
 
     // TODO: 2023/4/15 header delegate
     @ExceptionThrownFrom
@@ -273,7 +148,6 @@ public class ResourceServletTest extends ServletTest {
         });
     }
 
-
     // TODO: 2023/4/15 providers gets message body writer
     @ExceptionThrownFrom
     private void providers_getMessageBodyWriter(RuntimeException exception) {
@@ -282,7 +156,6 @@ public class ResourceServletTest extends ServletTest {
         when(providers.getMessageBodyWriter(eq(Double.class), eq(Double.class), eq(new Annotation[0]),
             eq(MediaType.TEXT_PLAIN_TYPE))).thenThrow(exception);
     }
-
 
     // TODO: 2023/4/15 message body writer write
     @ExceptionThrownFrom
@@ -306,7 +179,7 @@ public class ResourceServletTest extends ServletTest {
     }
 
     @TestFactory
-    public List<DynamicTest> should_respond_based_on_exception_thrown() {
+    public List<DynamicTest> RespondForException() {
         List<DynamicTest> tests = new ArrayList<>();
 
         Map<String, Consumer<Consumer<RuntimeException>>> exceptions = Map.of("Other Exception", this::otherExceptionsThrownFrom,
@@ -350,7 +223,6 @@ public class ResourceServletTest extends ServletTest {
         assertEquals(Response.Status.FORBIDDEN.getStatusCode(), httpResponse.statusCode());
     }
 
-
     private void otherExceptionsThrownFrom(Consumer<RuntimeException> caller) {
         RuntimeException exception = new IllegalArgumentException();
         caller.accept(exception);
@@ -362,10 +234,77 @@ public class ResourceServletTest extends ServletTest {
         assertEquals(Response.Status.FORBIDDEN.getStatusCode(), httpResponse.statusCode());
     }
 
+    // TODO: 2023/4/14 throw WebApplicationException with response, use response
+    // TODO: 2023/4/14 throw other exception, use ExceptionMapper build response
+    @ExceptionThrownFrom
+    private void resourceRouter_dispatch(RuntimeException exception) {
+        when(router.dispatch(any(), eq(resourceContext))).thenThrow(exception);
+    }
+
+    // TODO: 2023/4/15 exception mapper
+    @ExceptionThrownFrom
+    private void exceptionMapper_toResponse(RuntimeException exception) {
+        when(router.dispatch(any(), eq(resourceContext))).thenThrow(RuntimeException.class);
+
+        when(providers.getExceptionMapper(eq(RuntimeException.class))).thenReturn(
+            e -> {
+                throw exception;
+            });
+    }
 
     @Retention(RetentionPolicy.RUNTIME)
     @interface ExceptionThrownFrom {
 
+    }
+
+    @Nested
+    class RespondForOutboundResponse {
+        // TODO: 2023/4/14 use status code as http status
+
+        @Test
+        public void should_use_status_from_response() {
+            response.status(Response.Status.NOT_MODIFIED).returnFrom(router);
+
+            HttpResponse<String> httpResponse = get("/test");
+            assertEquals(Response.Status.NOT_MODIFIED.getStatusCode(), httpResponse.statusCode());
+        }
+
+        // TODO: 2023/4/14 use headers as http headers
+        @Test
+        void should_use_http_headers_from_response() {
+            response
+                .headers("Set-Cookie", new NewCookie.Builder("SESSION_ID").value("session").build(),
+                    new NewCookie.Builder("USER_ID").value("user").build())
+                .returnFrom(router);
+
+            HttpResponse<String> httpResponse = get("/test");
+
+            assertArrayEquals(new String[] {"SESSION_ID=session", "USER_ID=user"},
+                httpResponse.headers().allValues("Set-Cookie").toArray());
+        }
+
+        // TODO: 2023/4/14 writer body using MessageBodyWriter
+        @Test
+        void should_writer_entity_to_http_response_using_message_body_writer() {
+            response
+                .entity(new GenericEntity<>("entity", String.class), new Annotation[0])
+                .returnFrom(router);
+
+            HttpResponse<String> httpResponse = get("/test");
+
+            Assertions.assertEquals("entity", httpResponse.body());
+        }
+
+        // TODO: 2023/4/15 entity is null , ignored WriterBodMessage
+        @Test
+        void should_not_call_message_body_writer_if_entity_is_null() {
+            response.entity(null, new Annotation[0]).returnFrom(router);
+
+            HttpResponse<String> httpResponse = get("/test");
+
+            assertEquals(Response.Status.OK.getStatusCode(), httpResponse.statusCode());
+            assertEquals("", httpResponse.body());
+        }
     }
 
     class OutboundResponseBuilder {
