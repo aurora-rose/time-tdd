@@ -16,4 +16,5 @@ public interface Runtime {
 
     ResourceRouter getResourceRouter();
 
+    UriInfoBuilder createUriInfoBuilder(HttpServletRequest request);
 }

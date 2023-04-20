@@ -1,24 +1,22 @@
 package com.time.tdd.rest;
 
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Vector;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.ws.rs.GET;
-import jakarta.ws.rs.Path;
-import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.container.ResourceContext;
-import jakarta.ws.rs.core.*;
+import jakarta.ws.rs.core.GenericEntity;
+import jakarta.ws.rs.core.HttpHeaders;
+import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.ext.RuntimeDelegate;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
-
-import java.lang.annotation.Annotation;
-import java.lang.reflect.Method;
-import java.net.URI;
-import java.util.*;
-import java.util.regex.Pattern;
-
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -26,380 +24,174 @@ import static org.mockito.Mockito.when;
  * dispatcher
  *
  * @author XuJian
- * @date 2023-04-18 20:09
+ * @date 2023-04-19 21:58
  **/
 public class ResourceDispatcherTest {
     private RuntimeDelegate delegate;
     private Runtime runtime;
+    private HttpServletRequest request;
+    private ResourceContext context;
+    private UriInfoBuilder builder;
+
 
     @BeforeEach
     public void before() {
-        delegate = mock(RuntimeDelegate.class);
         runtime = mock(Runtime.class);
+        delegate = mock(RuntimeDelegate.class);
         RuntimeDelegate.setInstance(delegate);
-        when(delegate.createResponseBuilder()).thenReturn(new Response.ResponseBuilder() {
-            private Object entity;
-            private int status;
+        when(delegate.createResponseBuilder()).thenReturn(new StubResponseBuilder());
 
-            @Override
-            public Response build() {
-                OutboundResponse response = mock(OutboundResponse.class);
-                when(response.getEntity()).thenReturn(entity);
-                return response;
-            }
+        request = mock(HttpServletRequest.class);
+        context = mock(ResourceContext.class);
+        when(request.getServletPath()).thenReturn("/users/1");
+        when(request.getMethod()).thenReturn("GET");
+        when(request.getHeaders(eq(HttpHeaders.ACCEPT))).thenReturn(new Vector<>(List.of(MediaType.WILDCARD)).elements());
 
-            @Override
-            public Response.ResponseBuilder clone() {
-                return null;
-            }
+        builder = mock(UriInfoBuilder.class);
+        when(runtime.createUriInfoBuilder(same(request))).thenReturn(builder);
+    }
 
-            @Override
-            public Response.ResponseBuilder status(int status) {
-                return null;
-            }
 
-            @Override
-            public Response.ResponseBuilder status(int status, String reasonPhrase) {
-                this.status = status;
-                return this;
-            }
+    // TODO: 2023/4/19 根据与Path匹配的结果，降序排列RootResource，选择第一个的RootResource
+    // TODO: 2023/4/19 R1，R2，R1 matched，R2 none R1
+    // TODO: 2023/4/19 R1,R2,R1,R2,matched,R1 result < R2 result R1
+    @Test
+    void should_use_matched_root_resource() {
+        GenericEntity entity = new GenericEntity("matched", String.class);
 
-            @Override
-            public Response.ResponseBuilder entity(Object entity) {
-                this.entity = entity;
-                return this;
-            }
+        ResourceRouter router = new DefaultResourceRouter(runtime, List.of(
+            rootResource(matched("/users/1", result("/1")), returns(entity)),
+            rootResource(unmatched("/users/1"))));
 
-            @Override
-            public Response.ResponseBuilder entity(Object entity, Annotation[] annotations) {
-                return null;
-            }
-
-            @Override
-            public Response.ResponseBuilder allow(String... methods) {
-                return null;
-            }
-
-            @Override
-            public Response.ResponseBuilder allow(Set<String> methods) {
-                return null;
-            }
-
-            @Override
-            public Response.ResponseBuilder cacheControl(CacheControl cacheControl) {
-                return null;
-            }
-
-            @Override
-            public Response.ResponseBuilder encoding(String encoding) {
-                return null;
-            }
-
-            @Override
-            public Response.ResponseBuilder header(String name, Object value) {
-                return null;
-            }
-
-            @Override
-            public Response.ResponseBuilder replaceAll(MultivaluedMap<String, Object> headers) {
-                return null;
-            }
-
-            @Override
-            public Response.ResponseBuilder language(String language) {
-                return null;
-            }
-
-            @Override
-            public Response.ResponseBuilder language(Locale language) {
-                return null;
-            }
-
-            @Override
-            public Response.ResponseBuilder type(MediaType type) {
-                return null;
-            }
-
-            @Override
-            public Response.ResponseBuilder type(String type) {
-                return null;
-            }
-
-            @Override
-            public Response.ResponseBuilder variant(Variant variant) {
-                return null;
-            }
-
-            @Override
-            public Response.ResponseBuilder contentLocation(URI location) {
-                return null;
-            }
-
-            @Override
-            public Response.ResponseBuilder cookie(NewCookie... cookies) {
-                return null;
-            }
-
-            @Override
-            public Response.ResponseBuilder expires(Date expires) {
-                return null;
-            }
-
-            @Override
-            public Response.ResponseBuilder lastModified(Date lastModified) {
-                return null;
-            }
-
-            @Override
-            public Response.ResponseBuilder location(URI location) {
-                return null;
-            }
-
-            @Override
-            public Response.ResponseBuilder tag(EntityTag tag) {
-                return null;
-            }
-
-            @Override
-            public Response.ResponseBuilder tag(String tag) {
-                return null;
-            }
-
-            @Override
-            public Response.ResponseBuilder variants(Variant... variants) {
-                return null;
-            }
-
-            @Override
-            public Response.ResponseBuilder variants(List<Variant> variants) {
-                return null;
-            }
-
-            @Override
-            public Response.ResponseBuilder links(Link... links) {
-                return null;
-            }
-
-            @Override
-            public Response.ResponseBuilder link(URI uri, String rel) {
-                return null;
-            }
-
-            @Override
-            public Response.ResponseBuilder link(String uri, String rel) {
-                return null;
-            }
-        });
+        OutboundResponse response = router.dispatch(request, context);
+        assertSame(entity, response.getGenericEntity());
+        assertEquals(200, response.getStatus());
     }
 
 
     @Test
-    void should() {
-        HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
-        ResourceContext context = Mockito.mock(ResourceContext.class);
+    void should_sort_matched_root_resource_descending_order() {
+        GenericEntity entity1 = new GenericEntity("1", String.class);
+        GenericEntity entity2 = new GenericEntity("2", String.class);
 
-        when(request.getServletPath()).thenReturn("/users");
-        when(context.getResource(eq(Users.class))).thenReturn(new Users());
+        ResourceRouter router = new DefaultResourceRouter(runtime, List.of(
+            rootResource(matched("/users/1", result("/1", 2)), returns(entity2)),
+            rootResource(matched("/users/1", result("/1", 1)), returns(entity1))));
 
-        Router router = new Router(runtime, List.of(new ResourceClass(Users.class)));
         OutboundResponse response = router.dispatch(request, context);
+        assertSame(entity1, response.getGenericEntity());
+        assertEquals(200, response.getStatus());
+    }
 
-        GenericEntity<String> entity = (GenericEntity<String>) response.getEntity();
+    // TODO: 2023/4/19 如果没有匹配的RootResource，则构造404的Response
+    @Test
+    public void should_return_404_if_no_root_resource_matched() {
+        ResourceRouter router = new DefaultResourceRouter(runtime, List.of(
+            rootResource(unmatched("/users/1"))));
 
-        Assertions.assertEquals("all", entity.getEntity());
+        OutboundResponse response = router.dispatch(request, context);
+        assertNull(response.getGenericEntity());
+        assertEquals(404, response.getStatus());
+
+
+    }
+
+    // TODO: 2023/4/19 如果返回的RootResource中无法匹配剩余的Path，则构造404的Response
+    @Test
+    public void should_return_404_if_no_resource_method_found() {
+        ResourceRouter router = new DefaultResourceRouter(runtime, List.of(
+            rootResource(matched("/users/1", result("/1", 2)))));
+
+        OutboundResponse response = router.dispatch(request, context);
+        assertNull(response.getGenericEntity());
+        assertEquals(404, response.getStatus());
     }
 
 
-    interface Resource {
+    // TODO: 2023/4/19 如果ResourceMethod返回null，则构造204的Response
 
-        Optional<ResourceMethod> matches(String path, String method, String[] mediaTypes, UriInfoBuilder builder);
+    @Test
+    public void should_return_204_if_method_return_null() {
+        ResourceRouter router = new DefaultResourceRouter(runtime, List.of(
+            rootResource(matched("/users/1", result("/1", 2)), returns(null))));
+
+        OutboundResponse response = router.dispatch(request, context);
+        assertNull(response.getGenericEntity());
+        assertEquals(204, response.getStatus());
     }
 
-    interface ResourceMethod {
 
-        GenericEntity<?> call(ResourceContext resourceContext, UriInfoBuilder builder);
+    private UriTemplate matched(String path, UriTemplate.MatchResult result) {
+        UriTemplate matchedUriTemplate = mock(UriTemplate.class);
+        when(matchedUriTemplate.match(eq(path))).thenReturn(Optional.of(result));
+        return matchedUriTemplate;
     }
 
-    interface RootResource extends Resource {
-        UriTemplate getUriTemplate();
+    private UriTemplate unmatched(String path) {
+        UriTemplate unmatchedUriTemplate = mock(UriTemplate.class);
+        when(unmatchedUriTemplate.match(eq(path))).thenReturn(Optional.empty());
+        return unmatchedUriTemplate;
     }
 
-    interface UriInfoBuilder {
-        void pushMatchedPath(String path);
-
-        void addParameter(String name, String value);
-
-        String getUnmatchedPath();
+    private UriTemplate.MatchResult result(String path) {
+        return new FakeMatchResult(path, 0);
     }
 
-    interface UriTemplate {
-        Optional<MatchResult> match(String path);
+    private UriTemplate.MatchResult result(String path, int order) {
+        return new FakeMatchResult(path, order);
+    }
 
-        interface MatchResult extends Comparable<MatchResult> {
-            String getMatched();
+    private ResourceRouter.RootResource rootResource(UriTemplate uriTemplate) {
+        ResourceRouter.RootResource unmatched = mock(ResourceRouter.RootResource.class);
+        when(unmatched.getUriTemplate()).thenReturn(uriTemplate);
+        when(unmatched.match(eq("/1"), eq("GET"), eq(new String[] {MediaType.WILDCARD}), eq(builder))).thenReturn(Optional.empty());
+        return unmatched;
+    }
 
-            String getRemaining();
+    private ResourceRouter.RootResource rootResource(UriTemplate uriTemplate, ResourceRouter.ResourceMethod method) {
+        ResourceRouter.RootResource matched = mock(ResourceRouter.RootResource.class);
+        when(matched.getUriTemplate()).thenReturn(uriTemplate);
+        when(matched.match(eq("/1"), eq("GET"), eq(new String[] {MediaType.WILDCARD}), eq(builder))).thenReturn(Optional.of(method));
+        return matched;
+    }
 
-            Map<String, String> getMatchedPathParameters();
+    private ResourceRouter.ResourceMethod returns(GenericEntity entity) {
+        ResourceRouter.ResourceMethod method = mock(ResourceRouter.ResourceMethod.class);
+        when(method.call(same(context), same(builder))).thenReturn(entity);
+        return method;
+    }
+
+    class FakeMatchResult implements UriTemplate.MatchResult {
+        private String remaning;
+        private Integer order;
+
+        public FakeMatchResult(String remaning, Integer order) {
+            this.remaning = remaning;
+            this.order = order;
         }
-    }
-
-    static class ResourceClass implements Resource {
 
 
-        private Pattern pattern;
-        private Class<?> resourcesClass;
-        private String path;
-        private Map<URITemplate, ResourceMethod> methods = new HashMap<>();
-
-
-        public ResourceClass(Class<?> resourcesClass) {
-            this.resourcesClass = resourcesClass;
-            path = resourcesClass.getAnnotation(Path.class).value();
-            pattern = Pattern.compile(path + "(/.*)?");
-
-            for (Method method : Arrays.stream(resourcesClass.getMethods()).filter(m -> m.isAnnotationPresent(GET.class)).toList()) {
-                methods.put(new URITemplate(pattern, method.getAnnotation(Produces.class).value()),
-                        new NormalResourceMethod(resourcesClass, method));
-            }
-
-            for (Method method : Arrays.stream(resourcesClass.getMethods()).filter(m -> m.isAnnotationPresent(Path.class)).toList()) {
-                Path path = method.getAnnotation(Path.class);
-                Pattern pattern = Pattern.compile(this.path + ("(/" + path + ")?"));
-                methods.put(new URITemplate(pattern, method.getAnnotation(Produces.class).value()),
-                        new SubResourceLocator(resourcesClass, method, new String[0]));
-            }
-
-
+        @Override
+        public String getMatched() {
+            return null;
         }
 
         @Override
-        public Optional<ResourceMethod> matches(String path, String method, String[] mediaTypes, UriInfoBuilder builder) {
-            if (!pattern.matcher(path).matches()) {
-                return Optional.empty();
-            }
-
-            return methods.entrySet().stream().filter(e -> e.getKey().uri.matcher(path).matches()).map(Map.Entry::getValue).findFirst();
-        }
-
-        record URITemplate(Pattern uri, String[] mediaTypes) {
-
-        }
-    }
-
-    static class NormalResourceMethod implements ResourceMethod {
-
-        private final Class<?> resourcesClass;
-        private final Method method;
-
-        public NormalResourceMethod(Class<?> resourcesClass, Method method) {
-            this.resourcesClass = resourcesClass;
-            this.method = method;
+        public String getRemaining() {
+            return remaning;
         }
 
         @Override
-        public GenericEntity<?> call(ResourceContext resourceContext, UriInfoBuilder builder) {
-            Object resource = resourceContext.getResource(resourcesClass);
-            try {
-                return new GenericEntity<>(method.invoke(resource), method.getGenericReturnType());
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        }
-    }
-
-    static class SubResource implements Resource {
-
-
-        private Class<? extends Object> subResourceClass;
-        private Object subResource;
-        private Map<ResourceClass.URITemplate, ResourceMethod> methods = new HashMap<>();
-
-
-        public SubResource(Object subResource) {
-            this.subResource = subResource;
-            this.subResourceClass = subResource.getClass();
+        public Map<String, String> getMatchedPathParameters() {
+            return null;
         }
 
         @Override
-        public Optional<ResourceMethod> matches(String path, String method, String[] mediaTypes, UriInfoBuilder builder) {
-            return Optional.empty();
+        public int compareTo(UriTemplate.MatchResult o) {
+            return order.compareTo(((FakeMatchResult) o).order);
         }
     }
 
-    static class SubResourceLocator implements ResourceMethod {
-
-        private Class<?> resourcesClass;
-        private Method method;
-        private String[] mediaTypes;
-
-        public SubResourceLocator(Class<?> resourcesClass, Method method, String[] mediaTypes) {
-            this.resourcesClass = resourcesClass;
-            this.method = method;
-            this.mediaTypes = mediaTypes;
-        }
-
-        @Override
-        public GenericEntity<?> call(ResourceContext resourceContext, UriInfoBuilder builder) {
-            Object resource = resourceContext.getResource(resourcesClass);
-            try {
-                Object subResource = method.invoke(resource);
-                return new SubResource(subResource)
-                        .matches(builder.getUnmatchedPath(), "GET", mediaTypes, builder).get()
-                        .call(resourceContext, builder);
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        }
-    }
-
-    static class Router implements ResourceRouter {
-
-
-        private final List<Resource> rootResources;
-        private Runtime runtime;
-
-        public Router(Runtime runtime, List<Resource> rootResources) {
-            this.runtime = runtime;
-            this.rootResources = rootResources;
-        }
-
-        @Override
-        public OutboundResponse dispatch(HttpServletRequest request, ResourceContext resourceContext) {
-
-
-            ResourceMethod resourceMethod = rootResources.stream().map(root -> root.matches(request.getServletPath(), "GET", new String[0], null))
-                    .filter(Optional::isPresent).findFirst().get().get();
-            try {
-                GenericEntity<?> entity = resourceMethod.call(resourceContext, null);
-                return (OutboundResponse) Response.ok(entity).build();
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        }
-    }
-
-    @Path("/users")
-    static class Users {
-        @GET
-        @Produces(MediaType.TEXT_PLAIN)
-        public String asText() {
-            return "all";
-        }
-
-
-        @Path("/orders")
-        public Orders getOrders() {
-            return new Orders();
-        }
-    }
-
-    static class Orders {
-        @GET
-        public String asText() {
-            return "all";
-        }
-    }
 
 }
 
