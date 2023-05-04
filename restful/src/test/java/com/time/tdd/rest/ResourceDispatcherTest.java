@@ -121,16 +121,16 @@ public class ResourceDispatcherTest {
     }
 
 
-    private UriTemplate matched(String path, UriTemplate.MatchResult result) {
+    private StubUriTemplate matched(String path, UriTemplate.MatchResult result) {
         UriTemplate matchedUriTemplate = mock(UriTemplate.class);
         when(matchedUriTemplate.match(eq(path))).thenReturn(Optional.of(result));
-        return matchedUriTemplate;
+        return new StubUriTemplate(matchedUriTemplate, result);
     }
 
-    private UriTemplate unmatched(String path) {
+    private StubUriTemplate unmatched(String path) {
         UriTemplate unmatchedUriTemplate = mock(UriTemplate.class);
         when(unmatchedUriTemplate.match(eq(path))).thenReturn(Optional.empty());
-        return unmatchedUriTemplate;
+        return new StubUriTemplate(unmatchedUriTemplate, null);
     }
 
     private UriTemplate.MatchResult result(String path) {
@@ -141,17 +141,20 @@ public class ResourceDispatcherTest {
         return new FakeMatchResult(path, order);
     }
 
-    private ResourceRouter.RootResource rootResource(UriTemplate uriTemplate) {
+    private ResourceRouter.RootResource rootResource(StubUriTemplate stub) {
         ResourceRouter.RootResource unmatched = mock(ResourceRouter.RootResource.class);
-        when(unmatched.getUriTemplate()).thenReturn(uriTemplate);
-        when(unmatched.match(eq("/1"), eq("GET"), eq(new String[] {MediaType.WILDCARD}), eq(builder))).thenReturn(Optional.empty());
+        when(unmatched.getUriTemplate()).thenReturn(stub.uriTemplate);
+        when(unmatched.match(same(stub.result), eq("GET"), eq(new String[] {MediaType.WILDCARD}), eq(builder))).thenReturn(
+            Optional.empty());
         return unmatched;
     }
 
-    private ResourceRouter.RootResource rootResource(UriTemplate uriTemplate, ResourceRouter.ResourceMethod method) {
+
+    private ResourceRouter.RootResource rootResource(StubUriTemplate stub, ResourceRouter.ResourceMethod method) {
         ResourceRouter.RootResource matched = mock(ResourceRouter.RootResource.class);
-        when(matched.getUriTemplate()).thenReturn(uriTemplate);
-        when(matched.match(eq("/1"), eq("GET"), eq(new String[] {MediaType.WILDCARD}), eq(builder))).thenReturn(Optional.of(method));
+        when(matched.getUriTemplate()).thenReturn(stub.uriTemplate);
+        when(matched.match(same(stub.result), eq("GET"), eq(new String[] {MediaType.WILDCARD}), eq(builder))).thenReturn(
+            Optional.of(method));
         return matched;
     }
 
@@ -159,6 +162,10 @@ public class ResourceDispatcherTest {
         ResourceRouter.ResourceMethod method = mock(ResourceRouter.ResourceMethod.class);
         when(method.call(same(context), same(builder))).thenReturn(entity);
         return method;
+    }
+
+    record StubUriTemplate(UriTemplate uriTemplate, UriTemplate.MatchResult result) {
+
     }
 
     class FakeMatchResult implements UriTemplate.MatchResult {
