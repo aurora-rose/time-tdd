@@ -5,10 +5,9 @@ package com.time.tdd.rest;
  * @date 2023-04-19 22:04
  **/
 interface UriInfoBuilder {
-    void pushMatchedPath(String path);
 
-    void addParameter(String name, String value);
+    Object getLastMatchedResource();
 
-    String getUnmatchedPath();
+    void addMatchedResource(Object resource);
 }
 

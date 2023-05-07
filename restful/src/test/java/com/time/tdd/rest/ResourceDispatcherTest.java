@@ -1,9 +1,5 @@
 package com.time.tdd.rest;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Vector;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.ws.rs.container.ResourceContext;
 import jakarta.ws.rs.core.GenericEntity;
@@ -12,9 +8,13 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.ext.RuntimeDelegate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Vector;
+
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.mock;
@@ -60,8 +60,8 @@ public class ResourceDispatcherTest {
         GenericEntity entity = new GenericEntity("matched", String.class);
 
         ResourceRouter router = new DefaultResourceRouter(runtime, List.of(
-            rootResource(matched("/users/1", result("/1")), returns(entity)),
-            rootResource(unmatched("/users/1"))));
+                rootResource(matched("/users/1", result("/1")), returns(entity)),
+                rootResource(unmatched("/users/1"))));
 
         OutboundResponse response = router.dispatch(request, context);
         assertSame(entity, response.getGenericEntity());
@@ -75,8 +75,8 @@ public class ResourceDispatcherTest {
         GenericEntity entity2 = new GenericEntity("2", String.class);
 
         ResourceRouter router = new DefaultResourceRouter(runtime, List.of(
-            rootResource(matched("/users/1", result("/1", 2)), returns(entity2)),
-            rootResource(matched("/users/1", result("/1", 1)), returns(entity1))));
+                rootResource(matched("/users/1", result("/1", 2)), returns(entity2)),
+                rootResource(matched("/users/1", result("/1", 1)), returns(entity1))));
 
         OutboundResponse response = router.dispatch(request, context);
         assertSame(entity1, response.getGenericEntity());
@@ -87,7 +87,7 @@ public class ResourceDispatcherTest {
     @Test
     public void should_return_404_if_no_root_resource_matched() {
         ResourceRouter router = new DefaultResourceRouter(runtime, List.of(
-            rootResource(unmatched("/users/1"))));
+                rootResource(unmatched("/users/1"))));
 
         OutboundResponse response = router.dispatch(request, context);
         assertNull(response.getGenericEntity());
@@ -100,7 +100,7 @@ public class ResourceDispatcherTest {
     @Test
     public void should_return_404_if_no_resource_method_found() {
         ResourceRouter router = new DefaultResourceRouter(runtime, List.of(
-            rootResource(matched("/users/1", result("/1", 2)))));
+                rootResource(matched("/users/1", result("/1", 2)))));
 
         OutboundResponse response = router.dispatch(request, context);
         assertNull(response.getGenericEntity());
@@ -113,7 +113,7 @@ public class ResourceDispatcherTest {
     @Test
     public void should_return_204_if_method_return_null() {
         ResourceRouter router = new DefaultResourceRouter(runtime, List.of(
-            rootResource(matched("/users/1", result("/1", 2)), returns(null))));
+                rootResource(matched("/users/1", result("/1", 2)), returns(null))));
 
         OutboundResponse response = router.dispatch(request, context);
         assertNull(response.getGenericEntity());
@@ -141,20 +141,20 @@ public class ResourceDispatcherTest {
         return new FakeMatchResult(path, order);
     }
 
-    private ResourceRouter.RootResource rootResource(StubUriTemplate stub) {
-        ResourceRouter.RootResource unmatched = mock(ResourceRouter.RootResource.class);
+    private ResourceRouter.Resource rootResource(StubUriTemplate stub) {
+        ResourceRouter.Resource unmatched = mock(ResourceRouter.Resource.class);
         when(unmatched.getUriTemplate()).thenReturn(stub.uriTemplate);
-        when(unmatched.match(same(stub.result), eq("GET"), eq(new String[] {MediaType.WILDCARD}), eq(builder))).thenReturn(
-            Optional.empty());
+        when(unmatched.match(same(stub.result), eq("GET"), eq(new String[]{MediaType.WILDCARD}), same(context), eq(builder))).thenReturn(
+                Optional.empty());
         return unmatched;
     }
 
 
-    private ResourceRouter.RootResource rootResource(StubUriTemplate stub, ResourceRouter.ResourceMethod method) {
-        ResourceRouter.RootResource matched = mock(ResourceRouter.RootResource.class);
+    private ResourceRouter.Resource rootResource(StubUriTemplate stub, ResourceRouter.ResourceMethod method) {
+        ResourceRouter.Resource matched = mock(ResourceRouter.Resource.class);
         when(matched.getUriTemplate()).thenReturn(stub.uriTemplate);
-        when(matched.match(same(stub.result), eq("GET"), eq(new String[] {MediaType.WILDCARD}), eq(builder))).thenReturn(
-            Optional.of(method));
+        when(matched.match(same(stub.result), eq("GET"), eq(new String[]{MediaType.WILDCARD}), same(context), eq(builder))).thenReturn(
+                Optional.of(method));
         return matched;
     }
 
