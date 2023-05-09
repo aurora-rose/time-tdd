@@ -3,6 +3,7 @@ package com.time.tdd.rest;
 import java.lang.annotation.Annotation;
 import java.net.URI;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -25,12 +26,14 @@ import static org.mockito.Mockito.when;
 public class StubResponseBuilder extends Response.ResponseBuilder {
     private Object entity;
     private int status;
+    private Set<String> allowed = new HashSet<>();
 
     @Override
     public Response build() {
         OutboundResponse response = mock(OutboundResponse.class);
         when(response.getEntity()).thenReturn(entity);
         when(response.getStatus()).thenReturn(status);
+        when(response.getAllowedMethods()).thenReturn(allowed);
         when(response.getGenericEntity()).thenReturn((GenericEntity) entity);
         return response;
     }
@@ -70,7 +73,8 @@ public class StubResponseBuilder extends Response.ResponseBuilder {
 
     @Override
     public Response.ResponseBuilder allow(Set<String> methods) {
-        return null;
+        allowed.addAll(methods);
+        return this;
     }
 
     @Override
