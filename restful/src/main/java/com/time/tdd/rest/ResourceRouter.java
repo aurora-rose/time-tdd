@@ -1,7 +1,9 @@
 package com.time.tdd.rest;
 
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.Arrays;
+import java.lang.reflect.Parameter;
+import java.lang.reflect.Type;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -13,10 +15,15 @@ import java.util.stream.Stream;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.ws.rs.HttpMethod;
 import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.container.ResourceContext;
 import jakarta.ws.rs.core.GenericEntity;
 import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.UriInfo;
+import static com.time.tdd.rest.DefaultResourceMethod.ValueConverter.singeValued;
+import static java.util.Arrays.stream;
 
 /**
  * @author XuJian
@@ -88,17 +95,27 @@ class DefaultResourceRouter implements ResourceRouter {
 
 class DefaultResourceMethod implements ResourceRouter.ResourceMethod {
 
-    private Method method;
-    private PathTemplate uriTemplate;
-    private String httpMethod;
+    private static final Map<Type, ValueConverter<?>> CONVERTERS = Map.of(
+        int.class, singeValued(Integer::parseInt),
+        String.class, singeValued(s -> s),
+        double.class, singeValued(Double::parseDouble)
+    );
+    private static final ValueProvider PATH_PARAM = (parameter, uriInfo) -> Optional.ofNullable(parameter.getAnnotation(PathParam.class))
+        .map(annotation -> uriInfo.getPathParameters().get(annotation.value()));
+    private static final ValueProvider QUERY_PARAM = ((parameter, uriInfo) -> Optional.ofNullable(parameter.getAnnotation(QueryParam.class))
+        .map(annotation -> uriInfo.getQueryParameters().get(annotation.value())));
+    private static final List<ValueProvider> PROVIDERS = List.of(PATH_PARAM, QUERY_PARAM);
+    private final Method method;
+    private final PathTemplate uriTemplate;
+    private final String httpMethod;
+
 
     public DefaultResourceMethod(Method method) {
         this.method = method;
         this.uriTemplate = new PathTemplate(Optional.ofNullable(method.getAnnotation(Path.class)).map(Path::value).orElse(""));
-        this.httpMethod = Arrays.stream(method.getAnnotations()).filter(m -> m.annotationType().isAnnotationPresent(HttpMethod.class))
+        this.httpMethod = stream(method.getAnnotations()).filter(m -> m.annotationType().isAnnotationPresent(HttpMethod.class))
             .findFirst().get().annotationType().getAnnotation(HttpMethod.class).value();
     }
-
 
     @Override
     public String getHttpMethod() {
@@ -113,9 +130,18 @@ class DefaultResourceMethod implements ResourceRouter.ResourceMethod {
     @Override
     public GenericEntity<?> call(ResourceContext resourceContext, UriInfoBuilder builder) {
         try {
-            Object result = method.invoke(builder.getLastMatchedResource());
-            return new GenericEntity<>(result, method.getGenericReturnType());
-        } catch (Exception e) {
+            UriInfo uriInfo = builder.createUriInfo();
+
+            Object result = method.invoke(builder.getLastMatchedResource(), stream(method.getParameters())
+                .map(parameter -> PROVIDERS.stream().map(provider -> provider.provide(parameter, uriInfo))
+                    .filter(Optional::isPresent)
+                    .findFirst()
+                    .flatMap(values -> values.map(v -> CONVERTERS.get(parameter.getType()).fromString(v)))
+                    .orElse(null))
+                .toArray(Object[]::new));
+
+            return result != null ? new GenericEntity<>(result, method.getGenericReturnType()) : null;
+        } catch (IllegalAccessException | InvocationTargetException e) {
             throw new RuntimeException(e);
         }
     }
@@ -123,6 +149,20 @@ class DefaultResourceMethod implements ResourceRouter.ResourceMethod {
     @Override
     public String toString() {
         return method.getDeclaringClass().getSimpleName() + "." + method.getName();
+    }
+
+
+    interface ValueProvider {
+        Optional<List<String>> provide(Parameter parameter, UriInfo uriInfo);
+    }
+
+
+    interface ValueConverter<T> {
+        static <T> ValueConverter<T> singeValued(Function<String, T> converter) {
+            return values -> converter.apply(values.get(0));
+        }
+
+        T fromString(List<String> values);
     }
 }
 
@@ -134,8 +174,8 @@ class ResourceMethods {
     }
 
     private static Map<String, List<ResourceRouter.ResourceMethod>> getResourceMethods(Method[] methods) {
-        return Arrays.stream(methods)
-            .filter(m -> Arrays.stream(m.getAnnotations()).anyMatch(a -> a.annotationType().isAnnotationPresent(HttpMethod.class)))
+        return stream(methods)
+            .filter(m -> stream(m.getAnnotations()).anyMatch(a -> a.annotationType().isAnnotationPresent(HttpMethod.class)))
             .map(DefaultResourceMethod::new)
             .collect(Collectors.groupingBy(ResourceRouter.ResourceMethod::getHttpMethod));
     }
@@ -229,8 +269,8 @@ class SubResourceLocators {
     private final List<ResourceRouter.Resource> subResourceLocators;
 
     public SubResourceLocators(Method[] methods) {
-        this.subResourceLocators = Arrays.stream(methods).filter(m -> m.isAnnotationPresent(Path.class)
-                && Arrays.stream(m.getAnnotations()).noneMatch(a -> a.annotationType().isAnnotationPresent(HttpMethod.class)))
+        this.subResourceLocators = stream(methods).filter(m -> m.isAnnotationPresent(Path.class)
+                && stream(m.getAnnotations()).noneMatch(a -> a.annotationType().isAnnotationPresent(HttpMethod.class)))
             .map((Function<Method, ResourceRouter.Resource>) SubResourceLocator::new).toList();
     }
 

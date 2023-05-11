@@ -2,6 +2,7 @@ package com.time.tdd.rest;
 
 import java.util.ArrayList;
 import java.util.List;
+import jakarta.ws.rs.core.UriInfo;
 
 /**
  * @author XuJian
@@ -22,6 +23,11 @@ class StubUriInfoBuilder implements UriInfoBuilder {
     @Override
     public void addMatchedResource(Object resource) {
         matchedResult.add(resource);
+    }
+
+    @Override
+    public UriInfo createUriInfo() {
+        return null;
     }
 }
 
