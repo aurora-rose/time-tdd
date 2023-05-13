@@ -1,5 +1,14 @@
 package com.time.tdd.rest;
 
+import jakarta.servlet.Servlet;
+import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.container.ResourceContext;
+import jakarta.ws.rs.core.*;
+import jakarta.ws.rs.ext.MessageBodyWriter;
+import jakarta.ws.rs.ext.Providers;
+import jakarta.ws.rs.ext.RuntimeDelegate;
+import org.junit.jupiter.api.*;
+
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.lang.annotation.Annotation;
@@ -8,37 +17,12 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.net.http.HttpResponse;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Consumer;
-import jakarta.servlet.Servlet;
-import jakarta.ws.rs.WebApplicationException;
-import jakarta.ws.rs.container.ResourceContext;
-import jakarta.ws.rs.core.GenericEntity;
-import jakarta.ws.rs.core.HttpHeaders;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.MultivaluedHashMap;
-import jakarta.ws.rs.core.MultivaluedMap;
-import jakarta.ws.rs.core.NewCookie;
-import jakarta.ws.rs.core.Response;
-import jakarta.ws.rs.ext.MessageBodyWriter;
-import jakarta.ws.rs.ext.Providers;
-import jakarta.ws.rs.ext.RuntimeDelegate;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DynamicTest;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestFactory;
+
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.same;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -51,7 +35,6 @@ public class ResourceServletTest extends ServletTest {
     private ResourceRouter router;
     private ResourceContext resourceContext;
     private Providers providers;
-    private OutboundResponseBuilder response;
     private RuntimeDelegate delegate;
 
     @Override
@@ -70,7 +53,6 @@ public class ResourceServletTest extends ServletTest {
 
     @BeforeEach
     public void before() {
-        response = response();
         delegate = mock(RuntimeDelegate.class);
         RuntimeDelegate.setInstance(delegate);
         when(delegate.createHeaderDelegate(eq(NewCookie.class))).thenReturn(new RuntimeDelegate.HeaderDelegate<>() {
@@ -98,16 +80,16 @@ public class ResourceServletTest extends ServletTest {
     public List<DynamicTest> RespondWhenExtensionMissing() {
         List<DynamicTest> tests = new ArrayList<>();
         Map<String, org.junit.jupiter.api.function.Executable> extensions = Map.of(
-            "MessageBodyWriter", () -> response().entity(new GenericEntity<>(1, Integer.class), new Annotation[0]).returnFrom(router),
-            "HeaderDelegate", () -> response().headers(HttpHeaders.DATE, new Date()).returnFrom(router),
-            "ExceptionMapper", () -> when(router.dispatch(any(), eq(resourceContext))).thenThrow(IllegalArgumentException.class)
+                "MessageBodyWriter", () -> response().entity(new GenericEntity<>(1, Integer.class), new Annotation[0]).returnFrom(router),
+                "HeaderDelegate", () -> response().headers(HttpHeaders.DATE, new Date()).returnFrom(router),
+                "ExceptionMapper", () -> when(router.dispatch(any(), eq(resourceContext))).thenThrow(IllegalArgumentException.class)
         );
 
         for (String name : extensions.keySet()) {
             tests.add(DynamicTest.dynamicTest(name + " not found ", () -> {
                 extensions.get(name).execute();
                 when(providers.getExceptionMapper(eq(NullPointerException.class))).thenReturn(
-                    e -> response().status(Response.Status.INTERNAL_SERVER_ERROR).build());
+                        e -> response().status(Response.Status.INTERNAL_SERVER_ERROR).build());
                 HttpResponse<String> httpResponse = get("/test");
                 assertEquals(Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), httpResponse.statusCode());
             }));
@@ -154,7 +136,7 @@ public class ResourceServletTest extends ServletTest {
         response().entity(new GenericEntity<>(2.5, Double.class), new Annotation[0]).returnFrom(router);
 
         when(providers.getMessageBodyWriter(eq(Double.class), eq(Double.class), eq(new Annotation[0]),
-            eq(MediaType.TEXT_PLAIN_TYPE))).thenThrow(exception);
+                eq(MediaType.TEXT_PLAIN_TYPE))).thenThrow(exception);
     }
 
     // TODO: 2023/4/15 message body writer write
@@ -163,19 +145,19 @@ public class ResourceServletTest extends ServletTest {
         response().entity(new GenericEntity<>(2.5, Double.class), new Annotation[0]).returnFrom(router);
 
         when(providers.getMessageBodyWriter(eq(Double.class), eq(Double.class), eq(new Annotation[0]),
-            eq(MediaType.TEXT_PLAIN_TYPE))).thenReturn(
-            new MessageBodyWriter<>() {
-                @Override
-                public boolean isWriteable(Class<?> type, Type genericType, Annotation[] annotations, MediaType mediaType) {
-                    return false;
-                }
+                eq(MediaType.TEXT_PLAIN_TYPE))).thenReturn(
+                new MessageBodyWriter<>() {
+                    @Override
+                    public boolean isWriteable(Class<?> type, Type genericType, Annotation[] annotations, MediaType mediaType) {
+                        return false;
+                    }
 
-                @Override
-                public void writeTo(Double aDouble, Class<?> type, Type genericType, Annotation[] annotations, MediaType mediaType,
-                                    MultivaluedMap<String, Object> httpHeaders, OutputStream entityStream) throws WebApplicationException {
-                    throw exception;
-                }
-            });
+                    @Override
+                    public void writeTo(Double aDouble, Class<?> type, Type genericType, Annotation[] annotations, MediaType mediaType,
+                                        MultivaluedMap<String, Object> httpHeaders, OutputStream entityStream) throws WebApplicationException {
+                        throw exception;
+                    }
+                });
     }
 
     @TestFactory
@@ -183,14 +165,14 @@ public class ResourceServletTest extends ServletTest {
         List<DynamicTest> tests = new ArrayList<>();
 
         Map<String, Consumer<Consumer<RuntimeException>>> exceptions = Map.of("Other Exception", this::otherExceptionsThrownFrom,
-            "WebApplicationException", this::webApplicationExceptionThrownFrom);
+                "WebApplicationException", this::webApplicationExceptionThrownFrom);
 
         Map<String, Consumer<RuntimeException>> callers = getCallers();
 
         for (Map.Entry<String, Consumer<RuntimeException>> caller : callers.entrySet()) {
             for (Map.Entry<String, Consumer<Consumer<RuntimeException>>> exceptionThrownFrom : exceptions.entrySet()) {
                 tests.add(DynamicTest.dynamicTest(caller.getKey() + " throws " + exceptionThrownFrom.getKey(),
-                    () -> exceptionThrownFrom.getValue().accept(caller.getValue())));
+                        () -> exceptionThrownFrom.getValue().accept(caller.getValue())));
             }
         }
 
@@ -201,7 +183,7 @@ public class ResourceServletTest extends ServletTest {
         Map<String, Consumer<RuntimeException>> callers = new HashMap<>();
 
         for (Method method : Arrays.stream(this.getClass().getDeclaredMethods())
-            .filter(m -> m.isAnnotationPresent(ExceptionThrownFrom.class)).toList()) {
+                .filter(m -> m.isAnnotationPresent(ExceptionThrownFrom.class)).toList()) {
             String name = method.getName();
             String callerName = name.substring(0, 1).toUpperCase() + name.substring(1).replace("-", ".");
 
@@ -228,7 +210,7 @@ public class ResourceServletTest extends ServletTest {
         caller.accept(exception);
 
         when(providers.getExceptionMapper(eq(IllegalArgumentException.class))).thenReturn(
-            e -> response().status(Response.Status.FORBIDDEN).build());
+                e -> response().status(Response.Status.FORBIDDEN).build());
 
         HttpResponse<String> httpResponse = get("/test");
         assertEquals(Response.Status.FORBIDDEN.getStatusCode(), httpResponse.statusCode());
@@ -247,9 +229,9 @@ public class ResourceServletTest extends ServletTest {
         when(router.dispatch(any(), eq(resourceContext))).thenThrow(RuntimeException.class);
 
         when(providers.getExceptionMapper(eq(RuntimeException.class))).thenReturn(
-            e -> {
-                throw exception;
-            });
+                e -> {
+                    throw exception;
+                });
     }
 
     @Retention(RetentionPolicy.RUNTIME)
@@ -263,7 +245,7 @@ public class ResourceServletTest extends ServletTest {
 
         @Test
         public void should_use_status_from_response() {
-            response.status(Response.Status.NOT_MODIFIED).returnFrom(router);
+            response().status(Response.Status.NOT_MODIFIED).returnFrom(router);
 
             HttpResponse<String> httpResponse = get("/test");
             assertEquals(Response.Status.NOT_MODIFIED.getStatusCode(), httpResponse.statusCode());
@@ -272,23 +254,23 @@ public class ResourceServletTest extends ServletTest {
         // TODO: 2023/4/14 use headers as http headers
         @Test
         void should_use_http_headers_from_response() {
-            response
-                .headers("Set-Cookie", new NewCookie.Builder("SESSION_ID").value("session").build(),
-                    new NewCookie.Builder("USER_ID").value("user").build())
-                .returnFrom(router);
+            response()
+                    .headers("Set-Cookie", new NewCookie.Builder("SESSION_ID").value("session").build(),
+                            new NewCookie.Builder("USER_ID").value("user").build())
+                    .returnFrom(router);
 
             HttpResponse<String> httpResponse = get("/test");
 
-            assertArrayEquals(new String[] {"SESSION_ID=session", "USER_ID=user"},
-                httpResponse.headers().allValues("Set-Cookie").toArray());
+            assertArrayEquals(new String[]{"SESSION_ID=session", "USER_ID=user"},
+                    httpResponse.headers().allValues("Set-Cookie").toArray());
         }
 
         // TODO: 2023/4/14 writer body using MessageBodyWriter
         @Test
         void should_writer_entity_to_http_response_using_message_body_writer() {
-            response
-                .entity(new GenericEntity<>("entity", String.class), new Annotation[0])
-                .returnFrom(router);
+            response()
+                    .entity(new GenericEntity<>("entity", String.class), new Annotation[0])
+                    .returnFrom(router);
 
             HttpResponse<String> httpResponse = get("/test");
 
@@ -298,7 +280,7 @@ public class ResourceServletTest extends ServletTest {
         // TODO: 2023/4/15 entity is null , ignored WriterBodMessage
         @Test
         void should_not_call_message_body_writer_if_entity_is_null() {
-            response.entity(null, new Annotation[0]).returnFrom(router);
+            response().entity(null, new Annotation[0]).returnFrom(router);
 
             HttpResponse<String> httpResponse = get("/test");
 
@@ -363,22 +345,22 @@ public class ResourceServletTest extends ServletTest {
 
         private void stubMessageBodyWriter() {
             when(providers.getMessageBodyWriter(eq(String.class), eq(String.class), same(annotations), eq(mediaType)))
-                .thenReturn(new MessageBodyWriter<>() {
-                    @Override
-                    public boolean isWriteable(Class<?> type, Type genericType, Annotation[] annotations, MediaType mediaType) {
-                        return false;
-                    }
+                    .thenReturn(new MessageBodyWriter<>() {
+                        @Override
+                        public boolean isWriteable(Class<?> type, Type genericType, Annotation[] annotations, MediaType mediaType) {
+                            return false;
+                        }
 
-                    @Override
-                    public void writeTo(String s, Class<?> type, Type genericType, Annotation[] annotations, MediaType mediaType,
-                                        MultivaluedMap<String, Object> httpHeaders, OutputStream entityStream)
-                        throws WebApplicationException {
+                        @Override
+                        public void writeTo(String s, Class<?> type, Type genericType, Annotation[] annotations, MediaType mediaType,
+                                            MultivaluedMap<String, Object> httpHeaders, OutputStream entityStream)
+                                throws WebApplicationException {
 
-                        PrintWriter writer = new PrintWriter(entityStream);
-                        writer.write(s);
-                        writer.flush();
-                    }
-                });
+                            PrintWriter writer = new PrintWriter(entityStream);
+                            writer.write(s);
+                            writer.flush();
+                        }
+                    });
         }
 
     }

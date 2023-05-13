@@ -1,5 +1,11 @@
 package com.time.tdd.rest;
 
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.container.ResourceContext;
+import jakarta.ws.rs.core.UriInfo;
+
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
@@ -8,10 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
-import jakarta.ws.rs.PathParam;
-import jakarta.ws.rs.QueryParam;
-import jakarta.ws.rs.container.ResourceContext;
-import jakarta.ws.rs.core.UriInfo;
+
 import static com.time.tdd.rest.MethodInvoker.ValueConverter.singeValued;
 import static java.util.Arrays.stream;
 
@@ -22,22 +25,22 @@ import static java.util.Arrays.stream;
 class MethodInvoker {
 
     private static final ValueProvider PATH_PARAM = (parameter, uriInfo) -> Optional.ofNullable(parameter.getAnnotation(PathParam.class))
-        .map(annotation -> uriInfo.getPathParameters().get(annotation.value()));
+            .map(annotation -> uriInfo.getPathParameters().get(annotation.value()));
     private static final ValueProvider QUERY_PARAM = ((parameter, uriInfo) -> Optional.ofNullable(parameter.getAnnotation(QueryParam.class))
-        .map(annotation -> uriInfo.getQueryParameters().get(annotation.value())));
+            .map(annotation -> uriInfo.getQueryParameters().get(annotation.value())));
     private static final List<ValueProvider> PROVIDERS = List.of(PATH_PARAM, QUERY_PARAM);
 
     private static Optional<Object> convert(Parameter parameter, List<String> values) {
         return PrimitiveConverter.convert(parameter, values)
-            .or(() -> ConverterConstructor.convert(parameter.getType(), values.get(0)))
-            .or(() -> ConverterFactory.convert(parameter.getType(), values.get(0)));
+                .or(() -> ConverterConstructor.convert(parameter.getType(), values.get(0)))
+                .or(() -> ConverterFactory.convert(parameter.getType(), values.get(0)));
     }
 
     private static Optional<Object> injectParameter(Parameter parameter, UriInfo uriInfo) {
         return PROVIDERS.stream().map(provider -> provider.provide(parameter, uriInfo))
-            .filter(Optional::isPresent)
-            .findFirst()
-            .flatMap(values -> values.flatMap(v -> convert(parameter, v)));
+                .filter(Optional::isPresent)
+                .findFirst()
+                .flatMap(values -> values.flatMap(v -> convert(parameter, v)));
     }
 
     private static Optional<Object> injectContext(Parameter parameter, ResourceContext resourceContext, UriInfo uriInfo) {
@@ -55,12 +58,17 @@ class MethodInvoker {
             UriInfo uriInfo = builder.createUriInfo();
 
             return method.invoke(builder.getLastMatchedResource(), stream(method.getParameters())
-                .map(parameter -> injectParameter(parameter, uriInfo)
-                    .or(() -> injectContext(parameter, resourceContext, uriInfo))
-                    .orElse(null))
-                .toArray(Object[]::new));
+                    .map(parameter -> injectParameter(parameter, uriInfo)
+                            .or(() -> injectContext(parameter, resourceContext, uriInfo))
+                            .orElse(null))
+                    .toArray(Object[]::new));
 
-        } catch (IllegalAccessException | InvocationTargetException e) {
+        } catch (InvocationTargetException e) {
+            if (e.getCause() instanceof WebApplicationException exception) {
+                throw exception;
+            }
+            throw new RuntimeException(e);
+        } catch (IllegalAccessException e) {
             throw new RuntimeException(e);
         }
     }
@@ -80,13 +88,13 @@ class MethodInvoker {
 
 class PrimitiveConverter {
     private static final Map<Type, MethodInvoker.ValueConverter<Object>> PRIMITIVES = Map.of(
-        int.class, singeValued(Integer::parseInt),
-        String.class, singeValued(s -> s),
-        double.class, singeValued(Double::parseDouble),
-        short.class, singeValued(Short::parseShort),
-        float.class, singeValued(Float::parseFloat),
-        byte.class, singeValued(Byte::parseByte),
-        boolean.class, singeValued(Boolean::parseBoolean)
+            int.class, singeValued(Integer::parseInt),
+            String.class, singeValued(s -> s),
+            double.class, singeValued(Double::parseDouble),
+            short.class, singeValued(Short::parseShort),
+            float.class, singeValued(Float::parseFloat),
+            byte.class, singeValued(Byte::parseByte),
+            boolean.class, singeValued(Boolean::parseBoolean)
     );
 
     private PrimitiveConverter() {
@@ -94,7 +102,7 @@ class PrimitiveConverter {
 
     public static Optional<Object> convert(Parameter parameter, List<String> values) {
         return Optional.ofNullable(PRIMITIVES.get(parameter.getType()))
-            .map(c -> c.fromString(values));
+                .map(c -> c.fromString(values));
     }
 }
 
@@ -105,7 +113,8 @@ class ConverterConstructor {
     public static Optional<Object> convert(Class<?> converter, String value) {
         try {
             return Optional.of(converter.getConstructor(String.class).newInstance(value));
-        } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
+        } catch (InstantiationException | IllegalAccessException | InvocationTargetException |
+                 NoSuchMethodException e) {
             return Optional.empty();
         }
     }
